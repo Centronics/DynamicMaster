@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using DynamicParser;
 using System.Threading;
@@ -14,7 +12,7 @@ namespace DynamicMaster
     /// Содержит набор систем, которые должны выполнить различные запросы, выдав различные, не пересекающиеся (не похожие) друг с другом ответы.
     /// Важно то, от ответы должны быть все, которые возможны в этой системе. Тогда ответ считается положительным.
     /// </summary>
-    class DynamicProcessor
+    public sealed class DynamicProcessor
     {
         readonly Neuron _workNeuron;
         readonly List<Neuron> _workNeuronList = new List<Neuron>();
@@ -26,6 +24,23 @@ namespace DynamicMaster
             foreach (char c in _workNeuron.ToString())
                 _mainCharSet.Add(char.ToUpper(c));
         }
+
+        /// <summary>
+        /// Проверяет, что текущий экземпляр <see cref="DynamicProcessor"/> обучен и способен выдать положительный результат хотя бы в одном случае.
+        /// </summary>
+        public bool IsReady { get; }
+
+        /// <summary>
+        /// Получает процессор, состоящий только из тех элементов, которые были активны в момент выполнения запроса.
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
+        DynamicProcessor GetDynamicProcessorByQuery(DynamicRequest request)
+        {
+
+        }
+
+        //operator[] для доступа к нейронам; 0 - рабочий, Count...
 
         /// <summary>
         /// Включается, если все <see cref="Neuron"/> выдали свои (отличные друг от друга) результаты. При этом, сколько карт, столько и результатов должно быть выдано.
@@ -48,11 +63,12 @@ namespace DynamicMaster
             HashSet<char> charSet = new HashSet<char>();
             object thisLock = new object();
 
-            ForEachHelper(_workNeuronList, neuron => ForEachHelper(neuron.FindRelation(processor), c =>
+            ForEachHelper(_workNeuronList, neuron =>
             {
-                lock (thisLock)
-                    charSet.Add(c);
-            }));
+                foreach (char c in neuron.FindRelation(processor))
+                    lock (thisLock)
+                        charSet.Add(c);
+            });
 
             return _mainCharSet.SetEquals(charSet);
         }
@@ -60,19 +76,21 @@ namespace DynamicMaster
         /// <summary>
         /// Создаёт новые <see cref="Neuron"/>.
         /// </summary>
-        /// <param name="processors"></param>
-        public void FindRelation(DynamicRequest request)
+        /// <param name="request"></param>
+        public bool FindRelation(DynamicRequest request)
         {
             if (!IsActual(request))
                 throw new ArgumentException();
             Neuron neuron = _workNeuron.FindRelation(request);
-            if (neuron != null)
-                _workNeuronList.Add(neuron);
+            if (neuron == null)
+                return false;
+            _workNeuronList.Add(neuron);
+            return true;
         }
 
         public bool IsActual(DynamicRequest request) => _workNeuron.IsActual(request);
 
-        public string Query => _workNeuron.ToString();
+        public override string ToString() => _workNeuron.ToString();
 
         static void ForEachHelper<T>(IEnumerable<T> source, Action<T> action)
         {

@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.30804.86
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DynamicMaster", "DynamicMaster\DynamicMaster.csproj", "{AE098BA5-CF58-44AF-8E4A-D947C549C0C5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DynamicMasterTest", "DynamicMasterTest\DynamicMasterTest.csproj", "{8222204A-716F-4A9F-B1B7-3BFDDD6C8792}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{AE098BA5-CF58-44AF-8E4A-D947C549C0C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE098BA5-CF58-44AF-8E4A-D947C549C0C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE098BA5-CF58-44AF-8E4A-D947C549C0C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8222204A-716F-4A9F-B1B7-3BFDDD6C8792}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8222204A-716F-4A9F-B1B7-3BFDDD6C8792}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8222204A-716F-4A9F-B1B7-3BFDDD6C8792}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8222204A-716F-4A9F-B1B7-3BFDDD6C8792}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

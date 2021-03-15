@@ -32,13 +32,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="DynamicMosaic">
-      <HintPath>..\..\..\Программы\Системы программирования\ДИС\DynamicMosaicRelease_20\Скомпилировано\DynamicMosaic.dll</HintPath>
+      <HintPath>\\Mac\Home\Documents\ДИС\DynamicMosaic.dll</HintPath>
     </Reference>
     <Reference Include="DynamicParser">
-      <HintPath>..\..\..\Программы\Системы программирования\ДИС\DynamicParserRelease\Скомпилировано\Библиотека\DynamicParser.dll</HintPath>
+      <HintPath>\\Mac\Home\Documents\ДИС\DynamicParser.dll</HintPath>
     </Reference>
     <Reference Include="DynamicProcessor">
-      <HintPath>..\..\..\Программы\Системы программирования\ДИС\DynamicProcessorLib\Библиотека\DynamicProcessor.dll</HintPath>
+      <HintPath>\\Mac\Home\Documents\ДИС\DynamicProcessor.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -57,6 +57,7 @@
     <Compile Include="DynamicProcessor.cs" />
     <Compile Include="DynamicRequest.cs" />
     <Compile Include="Neuron.cs" />
+    <Compile Include="ProcessorStorage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
