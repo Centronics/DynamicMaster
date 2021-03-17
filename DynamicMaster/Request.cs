@@ -7,12 +7,12 @@ using Processor = DynamicParser.Processor;
 
 namespace DynamicMaster
 {
-    public class DynamicRequest
+    public class Request
     {
         readonly List<(Processor, string)> _dQueries = new List<(Processor, string)>();
         readonly HashSet<char> _mainCharSet = new HashSet<char>();
 
-        public DynamicRequest(IEnumerable<(Processor, string)> queries)
+        public Request(IEnumerable<(Processor, string)> queries)
         {
             if (queries == null)
                 throw new ArgumentNullException();
@@ -76,7 +76,7 @@ namespace DynamicMaster
             }
         }
 
-        public bool IsActual(DynamicRequest request)
+        public bool IsActual(Request request)//оптимизировать!
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));

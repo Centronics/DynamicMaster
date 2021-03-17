@@ -12,7 +12,7 @@ namespace DynamicMaster
     /// Содержит набор систем, которые должны выполнить различные запросы, выдав различные, не пересекающиеся (не похожие) друг с другом ответы.
     /// Важно то, от ответы должны быть все, которые возможны в этой системе. Тогда ответ считается положительным.
     /// </summary>
-    public sealed class DynamicProcessor
+    public sealed class DynamicProcessor //Убрать этот класс! Сделать возможность включения определённых нейронов... это и будет сеть.
     {
         readonly Neuron _workNeuron;
         readonly List<Neuron> _workNeuronList = new List<Neuron>();
@@ -35,12 +35,17 @@ namespace DynamicMaster
         /// </summary>
         /// <param name="query"></param>
         /// <returns></returns>
-        DynamicProcessor GetDynamicProcessorByQuery(DynamicRequest request)
+        DynamicProcessor GetDynamicProcessorByQuery(Request request)
         {
 
         }
 
         //operator[] для доступа к нейронам; 0 - рабочий, Count...
+
+        public bool FindRelation()//ищет решение для распознавания определённых карт и нерасп. определённых
+        {
+
+        }
 
         /// <summary>
         /// Включается, если все <see cref="Neuron"/> выдали свои (отличные друг от друга) результаты. При этом, сколько карт, столько и результатов должно быть выдано.
@@ -77,7 +82,7 @@ namespace DynamicMaster
         /// Создаёт новые <see cref="Neuron"/>.
         /// </summary>
         /// <param name="request"></param>
-        public bool FindRelation(DynamicRequest request)
+        public bool FindRelation(Request request)
         {
             if (!IsActual(request))
                 throw new ArgumentException();
@@ -88,7 +93,7 @@ namespace DynamicMaster
             return true;
         }
 
-        public bool IsActual(DynamicRequest request) => _workNeuron.IsActual(request);
+        public bool IsActual(Request request) => _workNeuron.IsActual(request);
 
         public override string ToString() => _workNeuron.ToString();
 

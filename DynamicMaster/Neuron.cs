@@ -11,7 +11,7 @@ using Processor = DynamicParser.Processor;
 
 namespace DynamicMaster
 {
-    sealed class Neuron
+    sealed class Neuron //сделать возможность создания сети, где определённые нейроны будут выдавать определённые сигналы
     {
         readonly ProcessorContainer _mainContainer;
         readonly HashSet<char> _mainCharSet;
@@ -118,7 +118,7 @@ namespace DynamicMaster
             }
         }
 
-        public Neuron FindRelation(DynamicRequest request)
+        public Neuron FindRelation(Request request)
         {
             if (!request.IsActual(ToString()))
                 return null;
@@ -140,9 +140,12 @@ namespace DynamicMaster
                     preResult.AddRange(lstProcs);
             }
             //}
-            if (preResult != null)//проверить на соответствие всем буквам запроса
-                return new Neuron(preResult);
-            return null;
+            if (preResult == null)
+                return null;
+            StringBuilder sb = new StringBuilder(preResult.Count);
+            for (int k = 0; k < preResult.Count; ++k)
+                sb.Append(preResult[k].Tag[0]);
+            return request.IsActual(sb.ToString()) ? new Neuron(preResult) : null;
         }
 
         public string FindRelation(Processor processor)
@@ -337,7 +340,7 @@ namespace DynamicMaster
             return false;
         }*/
 
-        public bool IsActual(DynamicRequest request)
+        public bool IsActual(Request request)
         {
             if (request == null)
                 throw new ArgumentNullException();

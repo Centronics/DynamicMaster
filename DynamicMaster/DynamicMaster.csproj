@@ -55,7 +55,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DynamicProcessor.cs" />
-    <Compile Include="DynamicRequest.cs" />
+    <Compile Include="Request.cs" />
     <Compile Include="Neuron.cs" />
     <Compile Include="ProcessorStorage.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
