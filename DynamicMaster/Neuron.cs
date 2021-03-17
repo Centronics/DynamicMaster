@@ -18,7 +18,7 @@ namespace DynamicMaster
         readonly Dictionary<char, int> _procNames;
         readonly string _stringQuery;
 
-        public Neuron(ProcessorContainer pc)
+        public Neuron(ProcessorContainer pc)//проверить на совпадение карт по содержимому или названию
         {
             if (pc == null)
                 throw new ArgumentNullException();
@@ -123,15 +123,13 @@ namespace DynamicMaster
             if (!request.IsActual(ToString()))
                 return null;
             ProcessorContainer preResult = null;
-            //foreach (ProcessorContainer prc in Matrixes)
-            //{//ошибка: разные матрицы не могут сливаться
             foreach ((Processor processor, string query) in request.Queries)
             {
                 string internalQuery = TranslateQuery(query);
                 if (string.IsNullOrWhiteSpace(internalQuery))
                     throw new ArgumentException();
                 Reflex refResult = GetWorkReflex.FindRelation(processor, internalQuery);
-                if (refResult == null)//проверить на совпадение карт по содержимому или названию
+                if (refResult == null)
                     break;
                 List<Processor> lstProcs = new List<Processor>(GetNewProcessors(GetWorkReflex, refResult, internalQuery));
                 if (preResult == null)
@@ -139,7 +137,6 @@ namespace DynamicMaster
                 else
                     preResult.AddRange(lstProcs);
             }
-            //}
             if (preResult == null)
                 return null;
             StringBuilder sb = new StringBuilder(preResult.Count);
