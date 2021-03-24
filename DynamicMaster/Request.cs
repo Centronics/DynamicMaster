@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Processor = DynamicParser.Processor;
 
 namespace DynamicMaster
@@ -76,11 +74,11 @@ namespace DynamicMaster
             }
         }
 
-        public bool IsActual(Request request)//оптимизировать!
+        public bool IsActual(Request request)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
-            return IsActual(request.ToString());
+            return _mainCharSet.SetEquals(request._mainCharSet);
         }
 
         public bool IsActual(string query)

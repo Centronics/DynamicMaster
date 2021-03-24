@@ -118,11 +118,11 @@ namespace DynamicMaster
             }
         }
 
-        public Neuron FindRelation(Request request)
+        public Neuron FindRelation(Request request)//Никакой "автоподбор" не требуется. Запоминает причины и следствия путём "перебора"... Причина и следствие могут быть любыми, отсюда - любой цвет любого пикселя на карте. Если надо поменять символ карты, можно задать такую карту без ограничений. Это и есть "счётчик".
         {
             if (!request.IsActual(ToString()))
                 return null;
-            ProcessorContainer preResult = null;
+            List<Processor> lstProcs = new List<Processor>();
             foreach ((Processor processor, string query) in request.Queries)
             {
                 string internalQuery = TranslateQuery(query);
@@ -131,14 +131,9 @@ namespace DynamicMaster
                 Reflex refResult = GetWorkReflex.FindRelation(processor, internalQuery);
                 if (refResult == null)
                     break;
-                List<Processor> lstProcs = new List<Processor>(GetNewProcessors(GetWorkReflex, refResult, internalQuery));
-                if (preResult == null)
-                    preResult = new ProcessorContainer(lstProcs);
-                else
-                    preResult.AddRange(lstProcs);
+                lstProcs.AddRange(GetNewProcessors(GetWorkReflex, refResult, internalQuery));
             }
-            if (preResult == null)
-                return null;
+            ProcessorContainer preResult = new ProcessorContainer(lstProcs);
             StringBuilder sb = new StringBuilder(preResult.Count);
             for (int k = 0; k < preResult.Count; ++k)
                 sb.Append(preResult[k].Tag[0]);
@@ -188,10 +183,72 @@ namespace DynamicMaster
             return result.ToString();
         }
 
+        sealed class ProcessorHandler
+        {
+            readonly Dictionary<int, List<Processor>> _dicProcsWithTag = new Dictionary<int, List<Processor>>();
+            readonly HashSet<string> _hashProcs = new HashSet<string>();
+
+            public void AddProcessor(Processor p)
+            {
+                int hash = CRCIntCalc.GetHash(p);
+                if (!_dicProcsWithTag.TryGetValue(hash, out List<Processor> prcs))
+                {
+                    _dicProcsWithTag.Add(hash, new List<Processor> { p });
+                    _hashProcs.Add(p.Tag);//ПРОВЕРИТЬ имя карты.
+                    return;
+                }
+
+                char pTag = char.ToUpper(p.Tag[0]);
+                foreach (Processor prc in prcs)
+                {
+                    if (ProcessorCompare(prc, p) && char.ToUpper(prc.Tag[0]) == pTag)
+                        return;
+
+                    /*StringBuilder sbTag = new StringBuilder(p.Tag.Length);//ДОРОЖЕ
+                    int k = p.Tag.Length - 1;
+                    for (; k > 0 && p.Tag[k] == '0'; --k)
+                        ;
+                    string tTag1 = p.Tag.Substring(0, k + 1);
+                    if (_hashProcs.TryGetValue(tTag1, out int zeroCount))
+                    {
+                        _hashProcs[tTag1] = zeroCount + 1;
+                        tTag1 = p.Tag + '0';
+                    }
+                    else
+                    _hashProcs.Add(tTag1, 1);*/
+
+
+                    string tTag = p.Tag;
+                    while (_hashProcs.Contains(tTag))//Заменить на поиск в коллекции с количеством нулевых символов.
+                        tTag += '0';
+                    Processor tp = RenameProcessor(p, tTag);
+                    prcs.Add(tp);
+                    _hashProcs.Add(tp.Tag);
+                }
+            }
+
+            static bool ProcessorCompare(Processor p1, Processor p2)
+            {
+                if (p1 == null)
+                    throw new ArgumentNullException();
+                if (p2 == null)
+                    throw new ArgumentNullException();
+                if (p1.Height != p2.Height)
+                    throw new ArgumentException();
+                if (p1.Width != p2.Width)
+                    throw new ArgumentException();
+                for (int i = 0; i < p1.Width; ++i)
+                    for (int j = 0; j < p1.Height; ++j)
+                        if (p1[i, j] != p2[i, j])
+                            return false;
+                return true;
+            }
+        }
+
         /// <summary>
         ///     Предназначен для вычисления хеша определённой последовательности чисел типа <see cref="int" />.
         /// </summary>
-        static class CRCIntCalc
+        static class CRCIntCalc//Подсключить для выявления дубликатов.
         {
             /// <summary>
             ///     Таблица значений для расчёта хеша.
@@ -245,9 +302,6 @@ namespace DynamicMaster
                 for (int j = 0; j < p.Height; j++)
                     for (int i = 0; i < p.Width; i++)
                         yield return p[i, j].Value;
-
-                foreach (char c in p.Tag)
-                    yield return c;
             }
 
             /// <summary>
