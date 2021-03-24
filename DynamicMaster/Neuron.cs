@@ -85,14 +85,14 @@ namespace DynamicMaster
             return new Processor(sv, newTag);
         }
 
-        IEnumerable<Processor> GetNewProcessors(Reflex start, Reflex finish, string query)
+        IEnumerable<Processor> GetNewProcessors(Reflex start, Reflex finish/*, string query*/)
         {
             if (start == null)
                 throw new ArgumentNullException();
             if (finish == null)
                 throw new ArgumentNullException();
-            if (string.IsNullOrWhiteSpace(query))
-                throw new ArgumentException();
+            //if (string.IsNullOrWhiteSpace(query))
+            //  throw new ArgumentException();
             HashSet<char> hs = new HashSet<char>();
 
             for (int k = start.Count; k < finish.Count; ++k)
@@ -102,7 +102,7 @@ namespace DynamicMaster
                 yield return RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
             }
 
-            if (finish.Count - start.Count >= query.Length)
+            /*if (finish.Count - start.Count >= query.Length)
                 yield break;
 
             foreach (char c in query.Where(c => !hs.Contains(c)))
@@ -115,29 +115,36 @@ namespace DynamicMaster
                     yield return RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
                     break;
                 }
-            }
+            }*/
         }
 
         public Neuron FindRelation(Request request)//Никакой "автоподбор" не требуется. Запоминает причины и следствия путём "перебора"... Причина и следствие могут быть любыми, отсюда - любой цвет любого пикселя на карте. Если надо поменять символ карты, можно задать такую карту без ограничений. Это и есть "счётчик".
         {
             if (!request.IsActual(ToString()))
                 return null;
-            List<Processor> lstProcs = new List<Processor>();
+            ProcessorHandler ph = new ProcessorHandler();
             foreach ((Processor processor, string query) in request.Queries)
             {
                 string internalQuery = TranslateQuery(query);
                 if (string.IsNullOrWhiteSpace(internalQuery))
                     throw new ArgumentException();
                 Reflex refResult = GetWorkReflex.FindRelation(processor, internalQuery);
-                if (refResult == null)
-                    break;
-                lstProcs.AddRange(GetNewProcessors(GetWorkReflex, refResult, internalQuery));
+                if (refResult != null)
+                    ph.AddRange(GetNewProcessors(GetWorkReflex, refResult /*, internalQuery*/));
             }
-            ProcessorContainer preResult = new ProcessorContainer(lstProcs);
-            StringBuilder sb = new StringBuilder(preResult.Count);
-            for (int k = 0; k < preResult.Count; ++k)
-                sb.Append(preResult[k].Tag[0]);
-            return request.IsActual(sb.ToString()) ? new Neuron(preResult) : null;
+            if (ph.IsEmpty)
+                return null;
+            StringBuilder sb = new StringBuilder(ph.Count);
+            ProcessorContainer pc = null;
+            foreach (Processor p in ph.Processors)
+            {
+                if (pc == null)
+                    pc = new ProcessorContainer(p);
+                else
+                    pc.Add(p);
+                sb.Append(p.Tag[0]);
+            }
+            return request.IsActual(sb.ToString()) ? new Neuron(pc) : null;
         }
 
         public string FindRelation(Processor processor)
@@ -188,43 +195,46 @@ namespace DynamicMaster
             readonly Dictionary<int, List<Processor>> _dicProcsWithTag = new Dictionary<int, List<Processor>>();
             readonly HashSet<string> _hashProcs = new HashSet<string>();
 
-            public void AddProcessor(Processor p)
+            public IEnumerable<Processor> Processors => _dicProcsWithTag.Values.SelectMany(processors => processors);
+
+            public int Count { get; private set; }
+
+            public bool IsEmpty { get; private set; } = true;
+
+            Processor GetUniqueProcessor(Processor p)
+            {
+                if (!_hashProcs.Contains(p.Tag))
+                    return p;
+                string tTag = p.Tag;
+                do
+                {
+                    tTag += '0';
+                } while (_hashProcs.Contains(tTag));
+                _hashProcs.Add(tTag);
+                return RenameProcessor(p, tTag);
+            }
+
+            public void AddRange(IEnumerable<Processor> processors)
+            {
+                foreach (Processor processor in processors)
+                    Add(processor);
+            }
+
+            public void Add(Processor p)
             {
                 int hash = CRCIntCalc.GetHash(p);
-                if (!_dicProcsWithTag.TryGetValue(hash, out List<Processor> prcs))
+                if (_dicProcsWithTag.TryGetValue(hash, out List<Processor> prcs))
                 {
-                    _dicProcsWithTag.Add(hash, new List<Processor> { p });
-                    _hashProcs.Add(p.Tag);//ПРОВЕРИТЬ имя карты.
+                    if (prcs.Any(prc => ProcessorCompare(prc, p)))
+                        return;
+                    prcs.Add(GetUniqueProcessor(p));
+                    ++Count;
+                    IsEmpty = false;
                     return;
                 }
-
-                char pTag = char.ToUpper(p.Tag[0]);
-                foreach (Processor prc in prcs)
-                {
-                    if (ProcessorCompare(prc, p) && char.ToUpper(prc.Tag[0]) == pTag)
-                        return;
-
-                    /*StringBuilder sbTag = new StringBuilder(p.Tag.Length);//ДОРОЖЕ
-                    int k = p.Tag.Length - 1;
-                    for (; k > 0 && p.Tag[k] == '0'; --k)
-                        ;
-                    string tTag1 = p.Tag.Substring(0, k + 1);
-                    if (_hashProcs.TryGetValue(tTag1, out int zeroCount))
-                    {
-                        _hashProcs[tTag1] = zeroCount + 1;
-                        tTag1 = p.Tag + '0';
-                    }
-                    else
-                    _hashProcs.Add(tTag1, 1);*/
-
-
-                    string tTag = p.Tag;
-                    while (_hashProcs.Contains(tTag))//Заменить на поиск в коллекции с количеством нулевых символов.
-                        tTag += '0';
-                    Processor tp = RenameProcessor(p, tTag);
-                    prcs.Add(tp);
-                    _hashProcs.Add(tp.Tag);
-                }
+                _dicProcsWithTag.Add(hash, new List<Processor> { GetUniqueProcessor(p) });
+                ++Count;
+                IsEmpty = false;
             }
 
             static bool ProcessorCompare(Processor p1, Processor p2)
