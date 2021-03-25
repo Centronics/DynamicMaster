@@ -61,6 +61,8 @@ namespace DynamicMaster
         /// <returns>В случае ошибки возвращается <see cref="string.Empty"/>. В противном случае, строка внутреннего запроса.</returns>
         string TranslateQuery(string query)
         {
+            if (string.IsNullOrEmpty(query))
+                throw new ArgumentException();
             StringBuilder sb = new StringBuilder(query.Length);
             foreach (char c in query)
             {
@@ -125,26 +127,11 @@ namespace DynamicMaster
             ProcessorHandler ph = new ProcessorHandler();
             foreach ((Processor processor, string query) in request.Queries)
             {
-                string internalQuery = TranslateQuery(query);
-                if (string.IsNullOrWhiteSpace(internalQuery))
-                    throw new ArgumentException();
-                Reflex refResult = GetWorkReflex.FindRelation(processor, internalQuery);
+                Reflex refResult = GetWorkReflex.FindRelation(processor, TranslateQuery(query));
                 if (refResult != null)
-                    ph.AddRange(GetNewProcessors(GetWorkReflex, refResult /*, internalQuery*/));
+                    ph.AddRange(GetNewProcessors(GetWorkReflex, refResult));
             }
-            if (ph.IsEmpty)
-                return null;
-            StringBuilder sb = new StringBuilder(ph.Count);
-            ProcessorContainer pc = null;
-            foreach (Processor p in ph.Processors)
-            {
-                if (pc == null)
-                    pc = new ProcessorContainer(p);
-                else
-                    pc.Add(p);
-                sb.Append(p.Tag[0]);
-            }
-            return request.IsActual(sb.ToString()) ? new Neuron(pc) : null;
+            return request.IsActual(ph.ToString()) ? new Neuron(ph.Processors) : null;
         }
 
         public string FindRelation(Processor processor)
@@ -194,8 +181,23 @@ namespace DynamicMaster
         {
             readonly Dictionary<int, List<Processor>> _dicProcsWithTag = new Dictionary<int, List<Processor>>();
             readonly HashSet<string> _hashProcs = new HashSet<string>();
+            readonly StringBuilder _sbQuery = new StringBuilder();
 
-            public IEnumerable<Processor> Processors => _dicProcsWithTag.Values.SelectMany(processors => processors);
+            public ProcessorContainer Processors
+            {
+                get
+                {
+                    if (IsEmpty)
+                        throw new Exception($"{nameof(ProcessorHandler)}: Список карт пуст.");
+                    ProcessorContainer pc = null;
+                    foreach (Processor p in _dicProcsWithTag.Values.SelectMany(processors => processors))
+                        if (pc == null)
+                            pc = new ProcessorContainer(p);
+                        else
+                            pc.Add(p);
+                    return pc;
+                }
+            }
 
             public int Count { get; private set; }
 
@@ -228,11 +230,13 @@ namespace DynamicMaster
                     if (prcs.Any(prc => ProcessorCompare(prc, p)))
                         return;
                     prcs.Add(GetUniqueProcessor(p));
+                    _sbQuery.Append(char.ToUpper(p.Tag[0]));
                     ++Count;
                     IsEmpty = false;
                     return;
                 }
                 _dicProcsWithTag.Add(hash, new List<Processor> { GetUniqueProcessor(p) });
+                _sbQuery.Append(char.ToUpper(p.Tag[0]));
                 ++Count;
                 IsEmpty = false;
             }
@@ -252,6 +256,11 @@ namespace DynamicMaster
                         if (p1[i, j] != p2[i, j])
                             return false;
                 return true;
+            }
+
+            public override string ToString()
+            {
+                return _sbQuery.ToString();
             }
         }
 
