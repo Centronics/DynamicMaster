@@ -54,6 +54,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CRCIntCalc.cs" />
+    <Compile Include="ProcessorHandler.cs" />
     <Compile Include="Request.cs" />
     <Compile Include="Neuron.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

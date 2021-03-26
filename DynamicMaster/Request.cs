@@ -5,7 +5,7 @@ using Processor = DynamicParser.Processor;
 
 namespace DynamicMaster
 {
-    public class Request
+    public sealed class Request
     {
         readonly List<(Processor, string)> _dQueries = new List<(Processor, string)>();
         readonly HashSet<char> _mainCharSet = new HashSet<char>();

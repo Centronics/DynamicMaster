@@ -1,58 +1,44 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using DynamicMosaic;
 using DynamicParser;
 using System.Text;
-using DynamicProcessor;
 using System.Threading;
 using System.Threading.Tasks;
 using Processor = DynamicParser.Processor;
 
 namespace DynamicMaster
 {
-    sealed class Neuron //сделать возможность создания сети, где определённые нейроны будут выдавать определённые сигналы
+    public sealed class Neuron
     {
         readonly ProcessorContainer _mainContainer;
-        readonly HashSet<char> _mainCharSet;
         readonly Dictionary<char, int> _procNames;
         readonly string _stringQuery;
 
-        public Neuron(ProcessorContainer pc)//проверить на совпадение карт по содержимому или названию
+        public Neuron(ProcessorContainer pc)
         {
             if (pc == null)
                 throw new ArgumentNullException();
             if (pc.Count > char.MaxValue)
                 throw new ArgumentException();
 
-            char cb = char.ToUpper(pc[0].Tag[0]);
+            _procNames = new Dictionary<char, int>(pc.Count);
             StringBuilder sb = new StringBuilder(pc.Count);
-            sb.Append(cb);
-
-            _procNames = new Dictionary<char, int>(pc.Count)
-            {
-                [cb] = (char)0
-            };
-            _mainCharSet = new HashSet<char>
-            {
-                (char)0
-            };
-
-            _mainContainer = new ProcessorContainer(RenameProcessor(pc[0], new string((char)0, 1)));
-
-            for (int k = 1; k < pc.Count; ++k)
+            ProcessorHandler ph = new ProcessorHandler();
+            for (int k = 0; k < pc.Count; ++k)
             {
                 char c = char.ToUpper(pc[k].Tag[0]), ck = Convert.ToChar(k);
                 sb.Append(c);
                 _procNames[c] = k;
-                _mainCharSet.Add(ck);
-                _mainContainer.Add(RenameProcessor(pc[k], ck.ToString()));
+                ph.Add(ProcessorHandler.RenameProcessor(pc[k], new string(ck, 1)));
             }
+
+            _mainContainer = ph.Processors;
             _stringQuery = sb.ToString();
-            GetWorkReflex = new Reflex(_mainContainer);
+            WorkReflex = new Reflex(_mainContainer);
         }
 
-        public Reflex GetWorkReflex { get; }
+        public Reflex WorkReflex { get; }
 
         /// <summary>
         /// Преобразует запрос из человекочитаемой формы во внутреннее его представление.
@@ -73,51 +59,17 @@ namespace DynamicMaster
             return sb.ToString();
         }
 
-        static Processor RenameProcessor(Processor processor, string newTag)
-        {
-            if (processor == null)
-                throw new ArgumentNullException(nameof(processor));
-            if (string.IsNullOrWhiteSpace(newTag))
-                throw new ArgumentException($"\"{nameof(newTag)}\" не может быть пустым или содержать только пробел.", nameof(newTag));
-
-            SignValue[,] sv = new SignValue[processor.Width, processor.Height];
-            for (int i = 0; i < processor.Width; ++i)
-                for (int j = 0; j < processor.Height; ++j)
-                    sv[i, j] = processor[i, j];
-            return new Processor(sv, newTag);
-        }
-
-        IEnumerable<Processor> GetNewProcessors(Reflex start, Reflex finish/*, string query*/)
+        IEnumerable<Processor> GetNewProcessors(Reflex start, Reflex finish)
         {
             if (start == null)
                 throw new ArgumentNullException();
             if (finish == null)
                 throw new ArgumentNullException();
-            //if (string.IsNullOrWhiteSpace(query))
-            //  throw new ArgumentException();
-            HashSet<char> hs = new HashSet<char>();
-
             for (int k = start.Count; k < finish.Count; ++k)
             {
                 Processor p = finish[k];
-                hs.Add(p.Tag[0]);
-                yield return RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
+                yield return ProcessorHandler.RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
             }
-
-            /*if (finish.Count - start.Count >= query.Length)
-                yield break;
-
-            foreach (char c in query.Where(c => !hs.Contains(c)))
-            {
-                for (int k = 0; k < start.Count; ++k)
-                {
-                    Processor p = start[k];
-                    if (p.Tag[0] != c)
-                        continue;
-                    yield return RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
-                    break;
-                }
-            }*/
         }
 
         public Neuron FindRelation(Request request)//Никакой "автоподбор" не требуется. Запоминает причины и следствия путём "перебора"... Причина и следствие могут быть любыми, отсюда - любой цвет любого пикселя на карте. Если надо поменять символ карты, можно задать такую карту без ограничений. Это и есть "счётчик".
@@ -127,9 +79,9 @@ namespace DynamicMaster
             ProcessorHandler ph = new ProcessorHandler();
             foreach ((Processor processor, string query) in request.Queries)
             {
-                Reflex refResult = GetWorkReflex.FindRelation(processor, TranslateQuery(query));
+                Reflex refResult = WorkReflex.FindRelation(processor, TranslateQuery(query));
                 if (refResult != null)
-                    ph.AddRange(GetNewProcessors(GetWorkReflex, refResult));
+                    ph.AddRange(GetNewProcessors(WorkReflex, refResult));
             }
             return request.IsActual(ph.ToString()) ? new Neuron(ph.Processors) : null;
         }
@@ -177,239 +129,6 @@ namespace DynamicMaster
             return result.ToString();
         }
 
-        sealed class ProcessorHandler
-        {
-            readonly Dictionary<int, List<Processor>> _dicProcsWithTag = new Dictionary<int, List<Processor>>();
-            readonly HashSet<string> _hashProcs = new HashSet<string>();
-            readonly StringBuilder _sbQuery = new StringBuilder();
-
-            public ProcessorContainer Processors
-            {
-                get
-                {
-                    if (IsEmpty)
-                        throw new Exception($"{nameof(ProcessorHandler)}: Список карт пуст.");
-                    ProcessorContainer pc = null;
-                    foreach (Processor p in _dicProcsWithTag.Values.SelectMany(processors => processors))
-                        if (pc == null)
-                            pc = new ProcessorContainer(p);
-                        else
-                            pc.Add(p);
-                    return pc;
-                }
-            }
-
-            public int Count { get; private set; }
-
-            public bool IsEmpty { get; private set; } = true;
-
-            Processor GetUniqueProcessor(Processor p)
-            {
-                if (!_hashProcs.Contains(p.Tag))
-                    return p;
-                string tTag = p.Tag;
-                do
-                {
-                    tTag += '0';
-                } while (_hashProcs.Contains(tTag));
-                _hashProcs.Add(tTag);
-                return RenameProcessor(p, tTag);
-            }
-
-            public void AddRange(IEnumerable<Processor> processors)
-            {
-                foreach (Processor processor in processors)
-                    Add(processor);
-            }
-
-            public void Add(Processor p)
-            {
-                int hash = CRCIntCalc.GetHash(p);
-                if (_dicProcsWithTag.TryGetValue(hash, out List<Processor> prcs))
-                {
-                    if (prcs.Any(prc => ProcessorCompare(prc, p)))
-                        return;
-                    prcs.Add(GetUniqueProcessor(p));
-                    _sbQuery.Append(char.ToUpper(p.Tag[0]));
-                    ++Count;
-                    IsEmpty = false;
-                    return;
-                }
-                _dicProcsWithTag.Add(hash, new List<Processor> { GetUniqueProcessor(p) });
-                _sbQuery.Append(char.ToUpper(p.Tag[0]));
-                ++Count;
-                IsEmpty = false;
-            }
-
-            static bool ProcessorCompare(Processor p1, Processor p2)
-            {
-                if (p1 == null)
-                    throw new ArgumentNullException();
-                if (p2 == null)
-                    throw new ArgumentNullException();
-                if (p1.Height != p2.Height)
-                    throw new ArgumentException();
-                if (p1.Width != p2.Width)
-                    throw new ArgumentException();
-                for (int i = 0; i < p1.Width; ++i)
-                    for (int j = 0; j < p1.Height; ++j)
-                        if (p1[i, j] != p2[i, j])
-                            return false;
-                return true;
-            }
-
-            public override string ToString()
-            {
-                return _sbQuery.ToString();
-            }
-        }
-
-        /// <summary>
-        ///     Предназначен для вычисления хеша определённой последовательности чисел типа <see cref="int" />.
-        /// </summary>
-        static class CRCIntCalc//Подсключить для выявления дубликатов.
-        {
-            /// <summary>
-            ///     Таблица значений для расчёта хеша.
-            ///     Вычисляется по алгоритму Далласа Максима (полином равен 49 (0x31).
-            /// </summary>
-            static readonly int[] Table;
-
-            /// <summary>
-            ///     Статический конструктор, рассчитывающий таблицу значений <see cref="Table" /> по алгоритму Далласа Максима (полином
-            ///     равен 49 (0x31).
-            /// </summary>
-            static CRCIntCalc()
-            {
-                int[] numArray = new int[256];
-                for (int index1 = 0; index1 < 256; ++index1)
-                {
-                    int num = index1;
-                    for (int index2 = 0; index2 < 8; ++index2)
-                        if ((uint)(num & 128) > 0U)
-                            num = (num << 1) ^ 49;
-                        else
-                            num <<= 1;
-                    numArray[index1] = num;
-                }
-
-                Table = numArray;
-            }
-
-            /// <summary>
-            ///     Получает хеш заданной карты.
-            ///     Карта не может быть равна <see langword="null" />.
-            /// </summary>
-            /// <param name="p">Карта, для которой необходимо вычислить значение хеша.</param>
-            /// <returns>Возвращает хеш заданной карты.</returns>
-            internal static int GetHash(Processor p)
-            {
-                if (p is null)
-                    throw new ArgumentNullException(nameof(p), $@"Функция {nameof(GetHash)}.");
-                return GetHash(GetInts(p));
-            }
-
-            /// <summary>
-            ///     Получает значения элементов карты построчно.
-            /// </summary>
-            /// <param name="p">Карта, с которой необходимо получить значения элементов.</param>
-            /// <returns>Возвращает значения элементов карты построчно.</returns>
-            static IEnumerable<int> GetInts(Processor p)
-            {
-                if (p is null)
-                    throw new ArgumentNullException(nameof(p), $@"Функция {nameof(GetInts)}.");
-                for (int j = 0; j < p.Height; j++)
-                    for (int i = 0; i < p.Width; i++)
-                        yield return p[i, j].Value;
-            }
-
-            /// <summary>
-            ///     Получает значение хеша для заданной последовательности целых чисел <see cref="int" />.
-            /// </summary>
-            /// <param name="ints">Последовательность, для которой необходимо рассчитать значение хеша.</param>
-            /// <returns>Возвращает значение хеша для заданной последовательности целых чисел <see cref="int" />.</returns>
-            static int GetHash(IEnumerable<int> ints)
-            {
-                if (ints is null)
-                    throw new ArgumentNullException(nameof(ints),
-                        $@"Для подсчёта контрольной суммы необходимо указать массив байт. Функция {nameof(GetHash)}.");
-                return ints.Aggregate(255, (current, t) => Table[(byte)(current ^ t)]);
-            }
-        }
-
-        /// <summary>
-        ///     Возвращает все варианты запросов для распознавания какой-либо карты.
-        /// </summary>
-        /// <param name="_mainContainer">Массив карт для чтения первых символов их названий. Остальные символы игнорируются.</param>
-        /// <returns>Возвращает все варианты запросов для распознавания какой-либо карты.</returns>
-        /*IEnumerable<ProcessorContainer> Matrixes
-        {
-            get
-            {
-                if (_mainContainer == null)
-                    throw new ArgumentNullException(nameof(_mainContainer), $"{nameof(Matrixes)}: Массив карт равен null.");
-                int mx = _mainContainer.Count;
-                if (mx <= 0)
-                    throw new ArgumentException($"{nameof(Matrixes)}: Массив карт пустой (ось X).", nameof(_mainContainer));
-                int[] count = new int[_mainContainer.Count];
-                HashSet<char> charSet = new HashSet<char>();
-                do
-                {
-                    ProcessorContainer result = null;
-                    charSet.Clear();
-                    for (int x = 0; x < mx; x++)
-                        if (count[x] < mx)
-                        {
-                            Processor p = _mainContainer[count[x]];
-                            charSet.Add(char.ToUpper(p.Tag[0]));
-                            if (result == null)
-                                result = new ProcessorContainer(p);
-                            else
-                                result.Add(p);
-                        }
-                    if (_mainCharSet.IsSubsetOf(charSet))
-                        yield return result;
-                } while (ChangeCount(count));
-            }
-        }*/
-
-        /// <summary>
-        ///     Увеличивает значение старших разрядов счётчика букв, если это возможно.
-        ///     Если увеличение было произведено, возвращается значение <see langword="true" />, в противном случае -
-        ///     <see langword="false" />.
-        /// </summary>
-        /// <param name="count">Массив-счётчик.</param>
-        /// <returns>
-        ///     Если увеличение было произведено, возвращается значение <see langword="true" />, в противном случае -
-        ///     <see langword="false" />.
-        /// </returns>
-        /*bool ChangeCount(int[] count)
-        {
-            if (count == null)
-                throw new ArgumentNullException(nameof(count), $"{nameof(ChangeCount)}: Массив-счётчик равен null.");
-            if (count.Length <= 0)
-                throw new ArgumentException(
-                    $"{nameof(ChangeCount)}: Длина массива-счётчика некорректна ({count.Length}).", nameof(count));
-            if (_mainContainer == null)
-                throw new ArgumentNullException(nameof(_mainContainer), $"{nameof(ChangeCount)}: Массив карт равен null.");
-            if (_mainContainer.Count <= 0)
-                throw new ArgumentException($"{nameof(ChangeCount)}: Массив карт пустой (ось X).", nameof(_mainContainer));
-            if (count.Length != _mainContainer.Count)
-                throw new ArgumentException(
-                    $"{nameof(ChangeCount)}: Длина массива-счётчика не соответствует длине массива карт.",
-                    nameof(_mainContainer));
-            for (int k = count.Length - 1; k >= 0; k--)
-            {
-                if (count[k] > _mainContainer.Count - 1)
-                    continue;
-                count[k]++;
-                for (int x = k + 1; x < count.Length; x++)
-                    count[x] = 0;
-                return true;
-            }
-            return false;
-        }*/
-
         public bool IsActual(Request request)
         {
             if (request == null)
@@ -422,7 +141,7 @@ namespace DynamicMaster
             get
             {
                 Processor p = _mainContainer[index];
-                return RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
+                return ProcessorHandler.RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
             }
         }
 
