@@ -13,6 +13,7 @@ namespace DynamicMaster
         readonly Dictionary<int, List<Processor>> _dicProcsWithTag = new Dictionary<int, List<Processor>>();
         readonly HashSet<string> _hashProcs = new HashSet<string>();
         readonly StringBuilder _sbQuery = new StringBuilder();
+        readonly HashSet<char> _procNames = new HashSet<char>();
 
         public ProcessorContainer Processors
         {
@@ -53,23 +54,33 @@ namespace DynamicMaster
                 Add(processor);
         }
 
-        public void Add(Processor p)
+        void AddProcessorName(char c)
+        {
+            c = char.ToUpper(c);
+            if (_procNames.Contains(c))
+                return;
+            _sbQuery.Append(c);
+            _procNames.Add(c);
+        }
+
+        public bool Add(Processor p)
         {
             int hash = CRCIntCalc.GetHash(p);
             if (_dicProcsWithTag.TryGetValue(hash, out List<Processor> prcs))
             {
                 if (prcs.Any(prc => ProcessorCompare(prc, p)))
-                    return;
+                    return false;
                 prcs.Add(GetUniqueProcessor(p));
-                _sbQuery.Append(char.ToUpper(p.Tag[0]));
+                AddProcessorName(p.Tag[0]);
                 ++Count;
                 IsEmpty = false;
-                return;
+                return true;
             }
             _dicProcsWithTag.Add(hash, new List<Processor> { GetUniqueProcessor(p) });
-            _sbQuery.Append(char.ToUpper(p.Tag[0]));
+            AddProcessorName(p.Tag[0]);
             ++Count;
             IsEmpty = false;
+            return true;
         }
 
         static bool ProcessorCompare(Processor p1, Processor p2)

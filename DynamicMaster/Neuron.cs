@@ -3,16 +3,14 @@ using System.Collections.Generic;
 using DynamicMosaic;
 using DynamicParser;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Processor = DynamicParser.Processor;
 
 namespace DynamicMaster
 {
     public sealed class Neuron
     {
-        readonly ProcessorContainer _mainContainer;
-        readonly Dictionary<char, int> _procNames;
+        readonly Reflex _workReflex;
+        readonly Dictionary<char, char> _procNames;
         readonly string _stringQuery;
 
         public Neuron(ProcessorContainer pc)
@@ -22,23 +20,21 @@ namespace DynamicMaster
             if (pc.Count > char.MaxValue)
                 throw new ArgumentException();
 
-            _procNames = new Dictionary<char, int>(pc.Count);
-            StringBuilder sb = new StringBuilder(pc.Count);
+            _procNames = new Dictionary<char, char>(pc.Count);
             ProcessorHandler ph = new ProcessorHandler();
-            for (int k = 0; k < pc.Count; ++k)
+            StringBuilder sb = new StringBuilder(pc.Count);
+            for (char k = char.MinValue; k < pc.Count; ++k)
             {
-                char c = char.ToUpper(pc[k].Tag[0]), ck = Convert.ToChar(k);
-                sb.Append(c);
+                if (!ph.Add(ProcessorHandler.RenameProcessor(pc[k], new string(k, 1))))
+                    continue;
+                char c = char.ToUpper(pc[k].Tag[0]);
                 _procNames[c] = k;
-                ph.Add(ProcessorHandler.RenameProcessor(pc[k], new string(ck, 1)));
+                sb.Append(c);
             }
 
-            _mainContainer = ph.Processors;
+            _workReflex = new Reflex(ph.Processors);
             _stringQuery = sb.ToString();
-            WorkReflex = new Reflex(_mainContainer);
         }
-
-        public Reflex WorkReflex { get; }
 
         /// <summary>
         /// Преобразует запрос из человекочитаемой формы во внутреннее его представление.
@@ -52,9 +48,9 @@ namespace DynamicMaster
             StringBuilder sb = new StringBuilder(query.Length);
             foreach (char c in query)
             {
-                if (!_procNames.TryGetValue(char.ToUpper(c), out int index))
+                if (!_procNames.TryGetValue(char.ToUpper(c), out char index))
                     return string.Empty;
-                sb.Append(Convert.ToChar(index));
+                sb.Append(index);
             }
             return sb.ToString();
         }
@@ -79,54 +75,11 @@ namespace DynamicMaster
             ProcessorHandler ph = new ProcessorHandler();
             foreach ((Processor processor, string query) in request.Queries)
             {
-                Reflex refResult = WorkReflex.FindRelation(processor, TranslateQuery(query));
+                Reflex refResult = _workReflex.FindRelation(processor, TranslateQuery(query));
                 if (refResult != null)
-                    ph.AddRange(GetNewProcessors(WorkReflex, refResult));
+                    ph.AddRange(GetNewProcessors(_workReflex, refResult));
             }
             return request.IsActual(ph.ToString()) ? new Neuron(ph.Processors) : null;
-        }
-
-        public string FindRelation(Processor processor)
-        {
-            if (processor == null)
-                throw new ArgumentNullException(nameof(processor));
-
-            object lockObject = new object();
-            StringBuilder result = new StringBuilder(_stringQuery.Length);
-            string errString = string.Empty, errStopped = string.Empty;
-            bool exThrown = false, exStopped = false;
-
-            ThreadPool.GetMinThreads(out _, out int comPortMin);
-            ThreadPool.SetMinThreads(Environment.ProcessorCount * 3, comPortMin);
-            ThreadPool.GetMaxThreads(out _, out int comPortMax);
-            ThreadPool.SetMaxThreads(Environment.ProcessorCount * 15, comPortMax);
-            Parallel.For(0, _stringQuery.Length, (k, state) =>
-            {
-                try
-                {
-                    if (!processor.GetEqual(_mainContainer).FindRelation(Convert.ToChar(k).ToString()))
-                        return;
-                    lock (lockObject)
-                        result.Append(_stringQuery[k]);
-                }
-                catch (Exception ex)
-                {
-                    try
-                    {
-                        errString = ex.Message;
-                        exThrown = true;
-                        state.Stop();
-                    }
-                    catch (Exception ex1)
-                    {
-                        errStopped = ex1.Message;
-                        exStopped = true;
-                    }
-                }
-            });
-            if (exThrown)
-                throw new Exception(exStopped ? $@"{errString}{Environment.NewLine}{errStopped}" : errString);
-            return result.ToString();
         }
 
         public bool IsActual(Request request)
@@ -140,12 +93,12 @@ namespace DynamicMaster
         {
             get
             {
-                Processor p = _mainContainer[index];
+                Processor p = _workReflex[index];
                 return ProcessorHandler.RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
             }
         }
 
-        public int Count => _mainContainer.Count;
+        public int Count => _workReflex.Count;
 
         public override string ToString() => _stringQuery;
     }
