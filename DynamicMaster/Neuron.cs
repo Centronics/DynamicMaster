@@ -9,6 +9,7 @@ namespace DynamicMaster
 {
     public sealed class Neuron
     {
+        readonly ProcessorContainer _processorContainer;
         readonly Reflex _workReflex;
         readonly Dictionary<char, char> _procNames;
         readonly string _stringQuery;
@@ -32,7 +33,8 @@ namespace DynamicMaster
                 sb.Append(c);
             }
 
-            _workReflex = new Reflex(ph.Processors);
+            _processorContainer = ph.Processors;
+            _workReflex = new Reflex(_processorContainer);
             _stringQuery = sb.ToString();
         }
 
@@ -82,6 +84,21 @@ namespace DynamicMaster
             return request.IsActual(ph.ToString()) ? new Neuron(ph.Processors) : null;
         }
 
+        public bool CheckRelation(Request request)
+        {
+            if (!request.IsActual(ToString()))
+                return false;
+            StringBuilder result = new StringBuilder(request.ToString().Length);
+            foreach ((Processor processor, string query) in request.Queries)
+            {
+                if (!processor.GetEqual(_processorContainer).FindRelation(TranslateQuery(query)))
+                    continue;
+                foreach (char c in query)
+                    result.Append(_stringQuery[c]);
+            }
+            return request.IsActual(result.ToString());
+        }
+
         public bool IsActual(Request request)
         {
             if (request == null)
@@ -93,12 +110,12 @@ namespace DynamicMaster
         {
             get
             {
-                Processor p = _workReflex[index];
+                Processor p = _processorContainer[index];
                 return ProcessorHandler.RenameProcessor(p, _stringQuery[p.Tag[0]].ToString());
             }
         }
 
-        public int Count => _workReflex.Count;
+        public int Count => _processorContainer.Count;
 
         public override string ToString() => _stringQuery;
     }
