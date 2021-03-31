@@ -70,10 +70,12 @@ namespace DynamicMaster
             }
         }
 
+        public Reflex ToReflex() => _workReflex;
+
         public Neuron FindRelation(Request request)//Никакой "автоподбор" не требуется. Запоминает причины и следствия путём "перебора"... Причина и следствие могут быть любыми, отсюда - любой цвет любого пикселя на карте. Если надо поменять символ карты, можно задать такую карту без ограничений. Это и есть "счётчик".
         {
             if (!request.IsActual(ToString()))
-                return null;
+                throw new ArgumentException();
             ProcessorHandler ph = new ProcessorHandler();
             foreach ((Processor processor, string query) in request.Queries)
             {
@@ -87,7 +89,7 @@ namespace DynamicMaster
         public bool CheckRelation(Request request)
         {
             if (!request.IsActual(ToString()))
-                return false;
+                throw new ArgumentException();
             StringBuilder result = new StringBuilder(request.ToString().Length);
             foreach ((Processor processor, string query) in request.Queries)
             {
